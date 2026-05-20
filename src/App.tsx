@@ -36,7 +36,6 @@ export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
-  const [precision, setPrecision] = useState<"standard" | "ultra">("ultra");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedFile = useMemo(() => 
@@ -86,14 +85,14 @@ export default function App() {
     }
   };
 
-  const processFile = async (id: string, precisionMode: "standard" | "ultra" = precision) => {
+  const processFile = async (id: string) => {
     const fileItem = files.find(f => f.id === id);
     if (!fileItem || fileItem.status === 'processing') return;
 
     setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'processing' } : f));
 
     try {
-      const result = await transcribeToSRT(fileItem.file, precisionMode);
+      const result = await transcribeToSRT(fileItem.file);
       setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'done', result } : f));
       return true;
     } catch (error) {
@@ -272,44 +271,6 @@ export default function App() {
                     )}
                   </div>
                 </ScrollArea>
-
-                <div className="pt-2 pb-1">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
-                    Chế độ đồng bộ thời gian:
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 bg-muted/60 p-1 rounded-lg border border-border">
-                    <button
-                      type="button"
-                      onClick={() => setPrecision("ultra")}
-                      className={cn(
-                        "py-2 px-2 text-xs font-medium rounded-md transition-all text-center flex flex-col items-center justify-center gap-1 border border-transparent cursor-pointer",
-                        precision === "ultra"
-                          ? "bg-white text-primary shadow-sm font-bold border-border"
-                          : "text-muted-foreground hover:bg-muted/30"
-                      )}
-                    >
-                      <span className="flex items-center gap-1 text-[11px] font-bold">
-                        Khớp từng chữ ⚡
-                      </span>
-                      <span className="text-[9px] opacity-75 leading-tight">1-3 từ/dòng, cực nhạy</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPrecision("standard")}
-                      className={cn(
-                        "py-2 px-2 text-xs font-medium rounded-md transition-all text-center flex flex-col items-center justify-center gap-1 border border-transparent cursor-pointer",
-                        precision === "standard"
-                          ? "bg-white text-primary shadow-sm font-bold border-border"
-                          : "text-muted-foreground hover:bg-muted/30"
-                      )}
-                    >
-                      <span className="flex items-center gap-1 text-[11px] font-bold">
-                        Tiêu chuẩn 📖
-                      </span>
-                      <span className="text-[9px] opacity-75 leading-tight">Dễ đọc hơn, 5-8 từ/dòng</span>
-                    </button>
-                  </div>
-                </div>
 
                 {/* Batch Controls */}
                 <div className="pt-4 space-y-3">
