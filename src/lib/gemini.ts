@@ -13,28 +13,30 @@ export async function transcribeToSRT(file: File, precision: "standard" | "ultra
   let promptDetails = "";
   if (precision === "ultra") {
     promptDetails = `
-    ĐẶC BIỆT CHÚ Ý (Yêu cầu khắt khe về độ chính xác thời gian):
-    - Hãy tạo phụ đề với độ khớp thời gian cực kỳ cao đến từng từ được nói (Word-level timestamps). Sau đây là cách triển khai:
-    - Hãy chia các phân đoạn phụ đề thành các cụm siêu ngắn (mỗi dòng chỉ nên chứa từ 1 đến 3 từ, tối đa là 4 từ). Việc này giúp phụ đề xuất hiện đồng bộ tuyệt đối với nhịp điệu phát âm từ của người nói.
-    - Thời gian bắt đầu (Start Time) và kết thúc (End Time) của từng dòng phụ đề phải căn chỉnh chuẩn xác đến mức mili-giây (ví dụ: 00:00:01,120 --> 00:00:02,040), phản ánh đúng thời điểm phát âm của các từ hiển thị trong dòng đó.
-    - Đảm bảo không có khoảng trống bị bỏ sót và không gộp nguyên một câu dài vào một mốc thời gian dài. Phải bẻ nhỏ câu ra tối đa để phụ đề nhấp nháy khớp hoàn hảo từng nhịp nói.
+    ĐẶC BIỆT CHÚ Ý (Yêu cầu khắt khe vượt trội về độ chính xác thời gian từng chữ - Word-by-word Ultra Matching):
+    - Đảm bảo phụ đề khớp tuyệt đối về mặt thời gian đến từng từ đơn được phát âm (Word-level synchronization).
+    - Cắt nhỏ phân đoạn tối đa: Mỗi phân đoạn chỉ được phép chứa từ 1 đến 2 từ (nhiều nhất là 3 từ ngắn). Tuyệt đối không gộp các cụm từ hay câu dài lại. Việc này giúp phụ đề bật tắt nhấp nháy đồng bộ hoàn hảo theo từng nhịp phát âm của giọng nói.
+    - Độ chính xác mili-giây tuyệt đối: Thời gian bắt đầu (Start Time) của dòng phụ đề phải trùng khớp với mili-giây đầu tiên từ đó được phát âm. Thời gian kết thúc (End Time) phải bằng mili-giây cuối cùng từ đó dứt âm. Vạch thời gian dạng "HH:MM:SS,mmm --> HH:MM:SS,mmm" phải vô cùng chuẩn xác.
+    - Không kéo dài qua khoảng lặng (Instant Termination on Silences): Khi người nói có khoảng dừng, nghỉ lấy hơi, ngắt câu, ngắt quãng hoặc có khoảng lặng > 0.15 giây, mốc kết thúc (End Time) của dòng phụ đề trước đó phải KHÓA NGAY LẬP TỨC tại thời điểm từ đó dừng phát âm. KHÔNG ĐƯỢC kéo dài dòng phụ đề đó lấn qua khoảng lặng.
+    - Khử hoàn toàn độ trễ tích lũy (Zero Latency Accumulation / Anti-Drift): Tuyệt đối không để xảy ra hiện tượng lệch mốc thời gian lũy tiến (drift - càng về sau càng bị chậm hay trễ hơn so với tiếng nói thực tế). Phải liên tục đối đối chiếu mốc thời gian tuyệt đối của file âm thanh/video để định vị chính xác.
     `;
   } else {
     promptDetails = `
     - Hãy tạo phụ đề với các câu tự nhiên, dễ đọc (tầm 5 đến 8 từ trên một phân đoạn).
     - Các mốc thời gian bắt đầu và kết thúc khớp nhịp nhàng với câu nói của người nói.
+    - Đảm bảo mốc thời gian bắt đầu khớp khi người nói bắt đầu câu và kết thúc ngay khi dứt câu, tránh lệch nhịp.
     `;
   }
 
   const prompt = `
-    Bạn là một chuyên gia tạo phụ đề chuyên nghiệp cấp cao. Hãy nghe/xem file đính kèm và tạo phụ đề định dạng SRT (.srt) chất lượng cao nhất.
+    Bạn là một hệ thống AI chuyển đổi âm thanh/video thành phụ đề chuyên nghiệp đỉnh cao có độ chính xác tuyệt đối. Nhiệm vụ của bạn là nghe/xem file đính kèm và tạo phụ đề định dạng SRT (.srt) chính xác nhất thế giới.
     
-    Yêu cầu chung:
-    1. Ngôn ngữ: Tự động nhận diện ngôn ngữ trong file và dịch/viết phụ đề chính xác bằng ngôn ngữ gốc đó.
-    2. Định dạng: SRT chuẩn hoàn toàn (Số thứ tự phân đoạn tăng dần bắt đầu từ 1, dòng thời gian dạng "HH:MM:SS,mmm --> HH:MM:SS,mmm", dòng nội dung văn bản).
-    3. Tránh tuyệt đối việc gộp nhiều câu dài vào một mốc thời gian không khớp.
+    Yêu cầu chung bắt buộc:
+    1. Ngôn ngữ: Tự động nhận diện chuẩn xác ngôn ngữ trong file và viết chuẩn xác 100% bằng ngôn ngữ gốc đó. Không được lược bỏ từ, không tóm tắt, không paraphrase.
+    2. Định dạng: SRT chuẩn hoàn toàn (Số thứ tự tăng dần bắt đầu từ 1, dòng thời gian "HH:MM:SS,mmm --> HH:MM:SS,mmm", dòng nội dung văn bản).
+    3. Không ảo tưởng hay phỏng đoán thời gian: Bạn phải phân tích dựa trên sóng âm thực tế để tìm mốc thời gian thật.
     ${promptDetails}
-    4. Chỉ trả về nội dung file SRT thô, không thêm bất kỳ lời giải thích, ghi chú hay thẻ định dạng Markdown nào khác (không bọc trong tag \`\`\`srt hay \`\`\`css, trả về trực tiếp nội dung bắt đầu bằng sđt 1).
+    4. Chỉ trả về nội dung file SRT thô, không thêm bất kỳ lời giải thích, ghi chú nào khác, không bọc trong các thẻ định dạng block code Markdown (không dùng \`\`\`srt hay \`\`\`css, trả về trực tiếp nội dung bắt đầu bằng số thứ tự 1).
   `;
 
   try {
@@ -53,6 +55,9 @@ export async function transcribeToSRT(file: File, precision: "standard" | "ultra
           ],
         },
       ],
+      config: {
+        temperature: 0.0, // Chế độ vô cùng chặt chẽ, tối ưu phân tích toán học các mốc thời gian và hạn chế tối đa sự sáng tạo lệch mốc.
+      },
     });
 
     return response.text || "";
