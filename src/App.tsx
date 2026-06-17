@@ -92,7 +92,9 @@ export default function App() {
     setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'processing' } : f));
 
     try {
-      const result = await transcribeToSRT(fileItem.file);
+      // Extract duration for better prompt grounding
+      const duration = await getMediaDuration(fileItem.file);
+      const result = await transcribeToSRT(fileItem.file, duration);
       setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'done', result } : f));
       return true;
     } catch (error) {
@@ -100,6 +102,22 @@ export default function App() {
       setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'error', error: 'Lỗi xử lý' } : f));
       return false;
     }
+  };
+
+  const getMediaDuration = (file: File): Promise<number> => {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const media = file.type.startsWith('audio') ? new Audio() : document.createElement('video');
+      media.src = url;
+      media.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        resolve(media.duration);
+      };
+      media.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(0);
+      };
+    });
   };
 
   const processAll = async () => {
